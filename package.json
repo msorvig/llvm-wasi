@@ -1,0 +1,15 @@
+{
+  "name": "wasi-clang",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    ".": "./dist/clang.js"
+  },
+  "scripts": {
+    "build": "rollup -c",
+    "dist": "rollup -c && ./copy-assets.sh"
+  },
+  "devDependencies": {
+    "rollup": "^4"
+  }
+}

@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASI Clang</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 12px;
+        }
+        header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+        header h1 { color: #00d9ff; font-size: 20px; }
+        header span { color: #888; font-size: 13px; }
+        .tabs {
+            display: flex;
+            gap: 2px;
+        }
+        .tab {
+            padding: 8px 20px;
+            background: #0f0f23;
+            color: #888;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .tab.active {
+            background: #16213e;
+            color: #00d9ff;
+        }
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            min-height: 0;
+        }
+        .input-panel {
+            display: flex;
+            flex-direction: column;
+            background: #16213e;
+            border-radius: 0 8px 8px 8px;
+            overflow: hidden;
+        }
+        .tab-content { display: none; flex: 1; flex-direction: column; }
+        .tab-content.active { display: flex; }
+        textarea {
+            flex: 1;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            background: #0f0f23;
+            color: #00ff00;
+            border: none;
+            padding: 12px;
+            resize: none;
+        }
+        textarea:focus { outline: none; }
+        .toolbar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px;
+        }
+        button {
+            background: #00d9ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #00b8d9; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .status-text {
+            font-size: 12px;
+            color: #888;
+        }
+        .status-text.success { color: #4caf50; }
+        .status-text.error { color: #f44336; }
+        .output-panel {
+            background: #16213e;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .output-panel h2 {
+            font-size: 14px;
+            color: #00d9ff;
+            padding: 10px 12px;
+        }
+        #output {
+            flex: 1;
+            background: #0f0f23;
+            color: #00ff00;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>WASI Clang</h1>
+        <span>Clang compiled to WebAssembly/WASI</span>
+    </header>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('c')">C</button>
+        <button class="tab" onclick="switchTab('cpp')">C++</button>
+        <button class="tab" onclick="switchTab('version')">Version</button>
+    </div>
+
+    <div class="main">
+        <div class="input-panel">
+            <div id="tab-c" class="tab-content active">
+                <textarea id="source-c">#include &lt;stdio.h&gt;
+
+int main() {
+    printf("Hello from WebAssembly!\n");
+
+    int sum = 0;
+    for (int i = 1; i &lt;= 10; i++) {
+        sum += i;
+    }
+    printf("Sum of 1-10: %d\n", sum);
+
+    return 0;
+}</textarea>
+                <div class="toolbar">
+                    <button onclick="compileC()">Compile</button>
+                    <span id="status-c" class="status-text"></span>
+                </div>
+            </div>
+
+            <div id="tab-cpp" class="tab-content">
+                <textarea id="source-cpp">#include &lt;iostream&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+#include &lt;numeric&gt;
+
+int main() {
+    std::vector&lt;int&gt; nums = {5, 3, 8, 1, 9, 2, 7, 4, 6, 10};
+
+    std::sort(nums.begin(), nums.end());
+
+    std::cout &lt;&lt; "Sorted: ";
+    for (int n : nums) {
+        std::cout &lt;&lt; n &lt;&lt; " ";
+    }
+    std::cout &lt;&lt; std::endl;
+
+    int sum = std::accumulate(nums.begin(), nums.end(), 0);
+    std::cout &lt;&lt; "Sum: " &lt;&lt; sum &lt;&lt; std::endl;
+
+    return 0;
+}</textarea>
+                <div class="toolbar">
+                    <button onclick="compileCpp()">Compile</button>
+                    <span id="status-cpp" class="status-text"></span>
+                </div>
+            </div>
+
+            <div id="tab-version" class="tab-content">
+                <div style="flex:1; display:flex; align-items:center; justify-content:center;">
+                    <button onclick="checkVersion()">Run clang --version</button>
+                </div>
+                <div class="toolbar">
+                    <span id="status-version" class="status-text"></span>
+                </div>
+            </div>
+        </div>
+
+        <div class="output-panel">
+            <h2>Output</h2>
+            <div id="output">Output will appear here...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { createClang } from './clang.js';
+
+        const output = document.getElementById('output');
+        const clang = createClang();
+        let activeTab = 'c';
+
+        window.switchTab = function(name) {
+            activeTab = name;
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', ['c','cpp','version'][i] === name);
+            });
+            document.querySelectorAll('.tab-content').forEach(t => {
+                t.classList.toggle('active', t.id === 'tab-' + name);
+            });
+        };
+
+        function log(text) {
+            output.textContent += text + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setStatus(text, type = '') {
+            const el = document.getElementById('status-' + activeTab);
+            if (el) { el.textContent = text; el.className = 'status-text ' + type; }
+        }
+
+        const streamOpts = { onStdout: log, onStderr: log };
+
+        async function doCompile(args, files, outFile) {
+            output.textContent = '';
+            try {
+                setStatus('Compiling...');
+                const result = await clang.run(args, files, streamOpts);
+                log(`Exit code: ${result.exitCode}`);
+                if (result.files[outFile]) {
+                    log(`Output: ${outFile} (${result.files[outFile].length} bytes)`);
+                    setStatus('OK', 'success');
+                } else {
+                    setStatus('Failed', 'error');
+                }
+            } catch (e) {
+                log('Error: ' + e.message);
+                setStatus(e.message, 'error');
+            }
+        }
+
+        window.checkVersion = async function() {
+            output.textContent = '';
+            try {
+                setStatus('Running...');
+                await clang.run(['clang', '--version'], {}, streamOpts);
+                setStatus('OK', 'success');
+            } catch (e) {
+                log('Error: ' + e.message);
+                setStatus(e.message, 'error');
+            }
+        };
+
+        window.compileC = function() {
+            doCompile(
+                ['clang', '-c', 'hello.c', '-o', 'hello.o', '--target=wasm32-wasip1', '-O2'],
+                { 'hello.c': document.getElementById('source-c').value },
+                'hello.o'
+            );
+        };
+
+        window.compileCpp = function() {
+            doCompile(
+                ['clang++', '-c', 'hello.cpp', '-o', 'hello.o', '--target=wasm32-wasip1', '-O2', '-std=c++17',
+                 '-stdlib++-isystem', '/usr/include/wasm32-wasip1/c++/v1'],
+                { 'hello.cpp': document.getElementById('source-cpp').value },
+                'hello.o'
+            );
+        };
+    </script>
+</body>
+</html>

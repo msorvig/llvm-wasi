@@ -1,0 +1,6 @@
+clang-macos/
+clang-wasi/
+dist/
+node_modules/
+Toolchain-WASI-LLVM.cmake
+.vscode/

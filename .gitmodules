@@ -1,0 +1,7 @@
+[submodule "llvm"]
+	path = llvm
+	url = https://github.com/msorvig/llvm-project-wasi.git
+	branch = wasi
+[submodule "nuscripten-core"]
+	path = nuscripten-core
+	url = git@github.com:msorvig/nuscripten-core.git
