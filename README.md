@@ -1,7 +1,7 @@
 
-# wasi-sdk-custom
+# llvm-wasi
 
-Clang/LLVM compiled to WebAssembly (wasm32-wasi), for running clang in the browser.
+Clang/LLVM compiled to WebAssembly (wasm32-wasi), for running clang and lld in the browser.
 Based on the approach and WASI portability patch from [YoWASP](https://github.com/YoWASP).
 
 ## Prerequisites
@@ -9,10 +9,8 @@ Based on the approach and WASI portability patch from [YoWASP](https://github.co
 - [wasi-sdk](https://github.com/WebAssembly/wasi-sdk/releases) (tested with 30.0)
 - CMake, Ninja
 - Node.js (for bundling and sysroot creation)
-
-Set the `WASI_SDK` environment variable to your wasi-sdk install path:
-
-    export WASI_SDK=/path/to/wasi-sdk-30.0
+- nuscripten-core (WASI runtime)
+- macOS host (hardcoded for now; any host can work)
 
 ## Clone
 
@@ -25,13 +23,17 @@ Set the `WASI_SDK` environment variable to your wasi-sdk install path:
 
 ## Build
 
+Set the `WASI_SDK` environment variable to your wasi-sdk install path:
+
+    export WASI_SDK=/path/to/wasi-sdk-30.0
+
     ./build.sh
 
 This runs four steps:
 
 1. Build LLVM/Clang for macOS (native host toolchain)
 2. Cross-compile Clang/LLD to wasm32-wasi using wasi-sdk
-3. Create sysroot bundle (C headers for in-browser use)
+3. Create sysroot bundle (headers + libraries for in-browser use)
 4. Bundle JS sources and assets into `dist/`
 
 Individual steps can be run separately:
@@ -45,25 +47,28 @@ Individual steps can be run separately:
 
 The `dist/` directory contains everything needed to run clang in the browser:
 
-- `clang.js` — main API (ES module)
-- `clang-worker.js` — web worker that runs LLVM tools
-- `bin/llvm.wasm` — clang/lld compiled to WebAssembly
-- `sysroot.bundle` — C headers (clang builtins + wasi-libc)
-- `index.html` — example page
+- `llvm.js` — main API (ES module)
+- `llvm-worker.js` — web worker that runs LLVM tools
+- `llvm.wasm` — clang + lld compiled to WebAssembly
+- `sysroot.bundle` — headers and static libraries (clang builtins, wasi-libc, libc++, compiler-rt)
+- `playground.html` — interactive playground
+- `playground.js` — playground API (Playground class + runtime)
 
-## Example
+The `dist/` branch contains checked in versions of the files.
 
-Open `dist/index.html` in a browser (requires a local server for ES module and worker support):
+## Playground
+
+Open `dist/playground.html` in a browser (requires a local server for ES module and worker support):
 
     cd dist && python3 -m http.server 8080
 
-The example page lets you compile C and C++ source code to `.o` files and check the clang version,
-all running in the browser.
+The playground lets you compile, link, and run C and C++ programs entirely in the browser.
+It includes examples for C (printf), C++ (std::print), and nuscripten (val.h JS interop).
 
 ## API
 
 ```js
-import { createClang } from './clang.js';
+import { createClang } from './llvm.js';
 
 const clang = createClang();
 const result = await clang.run(args, files, runOptions);
@@ -74,7 +79,7 @@ clang.terminate();
 
 Creates a worker pool that loads the wasm binary and sysroot in the background. Returns immediately.
 
-- `options.wasmPath` — URL to `llvm.wasm` (default: `./bin/llvm.wasm` relative to `clang.js`)
+- `options.wasmPath` — URL to `llvm.wasm` (default: `./llvm.wasm` relative to `llvm.js`)
 - `options.sysrootPath` — URL to `sysroot.bundle` (default: `./sysroot.bundle`)
 - `options.poolSize` — max concurrent workers (default: `navigator.hardwareConcurrency`)
 
@@ -82,7 +87,8 @@ Creates a worker pool that loads the wasm binary and sysroot in the background. 
 
 Runs an LLVM tool. Waits for initialization if needed.
 
-- `args` — command line as an array, e.g. `['clang', '-c', 'hello.c', '-o', 'hello.o']`
+- `args` — command line as an array, e.g. `['clang', '-c', 'hello.c', '-o', 'hello.o']`.
+  The first element selects the tool: `clang`, `clang++`, `wasm-ld`, `llvm-ar`, etc.
 - `files` — input files as `{ path: content }` where content is a string or Uint8Array.
   These are placed in an in-memory filesystem visible to the tool.
 - `runOptions.onStdout(line)` — callback for each stdout line
@@ -92,19 +98,40 @@ Returns a result object:
 
 - `result.exitCode` — process exit code (0 = success)
 - `result.files` — output files as `{ path: Uint8Array }`. Output files are
-  everything written by the tool, excluding sysroot files. For example,
-  `result.files['hello.o']` contains the compiled object file.
+  everything written by the tool, excluding sysroot files.
 - `result.stdout` — array of stdout lines
 - `result.stderr` — array of stderr lines
 
 ### Convenience functions
 
 ```js
-import { runClang, runClangPP, runLLVM } from './clang.js';
+import { runClang, runClangPP, runWasmLd, runLLVM } from './llvm.js';
 
-// Single-shot clang run (creates and terminates a worker automatically)
+// Single-shot clang run
 const result = await runClang(['-c', 'hello.c', '-o', 'hello.o'], { 'hello.c': src });
 
-// Same for C++
+// C++
 const result = await runClangPP(['-c', 'hello.cpp', '-o', 'hello.o'], { 'hello.cpp': src });
+
+// Link
+const result = await runWasmLd(['main.o', '-o', 'main.wasm', ...], { 'main.o': objectFile });
+
+// Any LLVM tool
+const result = await runLLVM(['llvm-ar', 'rcs', 'lib.a', 'a.o'], { 'a.o': objectFile });
+```
+
+### Playground class
+
+```js
+import { Playground } from './playground.js';
+
+const pg = new Playground({
+    onStdout: (line) => console.log(line),
+    onStderr: (line) => console.error(line),
+    onStatus: (text, type) => { /* 'Compiling...', 'Linking...', etc. */ },
+});
+
+const version = await pg.getVersion();  // "clang version 23.0.0git"
+const result = await pg.run('c', source);   // compile + link + run
+const result = await pg.run('cpp', source); // compile + link + run (C++)
 ```

@@ -16,7 +16,7 @@ npx rollup -c
 
 cp -L clang-wasi/bin/llvm dist/llvm.wasm
 cp clang-wasi/sysroot.bundle dist/
-cp example/index.html dist/
+cp playground/playground.html dist/
 
 echo ""
 echo "Built dist/:"

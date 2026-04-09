@@ -25,7 +25,7 @@ export function createClang(options = {}) {
     const wasmUrl = new URL(options.wasmPath || LLVM_WASM_PATH, import.meta.url).href;
     const sysrootUrl = new URL(options.sysrootPath || SYSROOT_BUNDLE_PATH, import.meta.url).href;
     const poolSize = options.poolSize || navigator.hardwareConcurrency || 4;
-    const workerUrl = new URL('./clang-worker.js', import.meta.url);
+    const workerUrl = new URL('./llvm-worker.js', import.meta.url);
 
     // Shared state set by the init worker
     let module = null;
@@ -169,6 +169,16 @@ export async function runClangPP(args, files = {}, options = {}) {
     const clang = createClang({ ...options, poolSize: 1 });
     try {
         return await clang.run(['clang++', ...args], files, options);
+    } finally {
+        clang.terminate();
+    }
+}
+
+// Convenience: run wasm-ld once
+export async function runWasmLd(args, files = {}, options = {}) {
+    const clang = createClang({ ...options, poolSize: 1 });
+    try {
+        return await clang.run(['wasm-ld', ...args], files, options);
     } finally {
         clang.terminate();
     }

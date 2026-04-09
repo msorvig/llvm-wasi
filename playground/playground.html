@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WASI Clang</title>
+    <title>WASI Clang Playground</title>
     <style>
         * { box-sizing: border-box; margin: 0; }
         body {
@@ -23,6 +23,7 @@
         }
         header h1 { color: #00d9ff; font-size: 20px; }
         header span { color: #888; font-size: 13px; }
+        #clang-version { margin-left: auto; color: #666; font-size: 12px; font-family: monospace; }
         .tabs {
             display: flex;
             gap: 2px;
@@ -66,13 +67,15 @@
             border: none;
             padding: 12px;
             resize: none;
+            tab-size: 4;
         }
         textarea:focus { outline: none; }
-        .toolbar {
+        .toolbar, .panel-header {
             display: flex;
             align-items: center;
             gap: 8px;
-            padding: 8px 12px;
+            padding: 0 12px;
+            height: 40px;
         }
         button {
             background: #00d9ff;
@@ -102,7 +105,6 @@
         .output-panel h2 {
             font-size: 14px;
             color: #00d9ff;
-            padding: 10px 12px;
         }
         #output {
             flex: 1;
@@ -118,19 +120,24 @@
 </head>
 <body>
     <header>
-        <h1>WASI Clang</h1>
-        <span>Clang compiled to WebAssembly/WASI</span>
+        <h1>WASI Clang Playground</h1>
+        <span>Compile, link, and run C/C++ in the browser</span>
+        <span id="clang-version"></span>
     </header>
 
     <div class="tabs">
         <button class="tab active" onclick="switchTab('c')">C</button>
         <button class="tab" onclick="switchTab('cpp')">C++</button>
-        <button class="tab" onclick="switchTab('version')">Version</button>
+        <button class="tab" onclick="switchTab('val')">nuscripten</button>
     </div>
 
     <div class="main">
         <div class="input-panel">
             <div id="tab-c" class="tab-content active">
+                <div class="toolbar">
+                    <button onclick="run('c')">Run</button>
+                    <span id="status-c" class="status-text"></span>
+                </div>
                 <textarea id="source-c">#include &lt;stdio.h&gt;
 
 int main() {
@@ -144,14 +151,14 @@ int main() {
 
     return 0;
 }</textarea>
-                <div class="toolbar">
-                    <button onclick="compileC()">Compile</button>
-                    <span id="status-c" class="status-text"></span>
-                </div>
             </div>
 
             <div id="tab-cpp" class="tab-content">
-                <textarea id="source-cpp">#include &lt;iostream&gt;
+                <div class="toolbar">
+                    <button onclick="run('cpp')">Run</button>
+                    <span id="status-cpp" class="status-text"></span>
+                </div>
+                <textarea id="source-cpp" spellcheck="false">#include &lt;print&gt;
 #include &lt;vector&gt;
 #include &lt;algorithm&gt;
 #include &lt;numeric&gt;
@@ -161,55 +168,66 @@ int main() {
 
     std::sort(nums.begin(), nums.end());
 
-    std::cout &lt;&lt; "Sorted: ";
+    std::print("Sorted:");
     for (int n : nums) {
-        std::cout &lt;&lt; n &lt;&lt; " ";
+        std::print(" {}", n);
     }
-    std::cout &lt;&lt; std::endl;
+    std::println();
 
     int sum = std::accumulate(nums.begin(), nums.end(), 0);
-    std::cout &lt;&lt; "Sum: " &lt;&lt; sum &lt;&lt; std::endl;
+    std::println("Sum: {}", sum);
 
     return 0;
 }</textarea>
-                <div class="toolbar">
-                    <button onclick="compileCpp()">Compile</button>
-                    <span id="status-cpp" class="status-text"></span>
-                </div>
             </div>
 
-            <div id="tab-version" class="tab-content">
-                <div style="flex:1; display:flex; align-items:center; justify-content:center;">
-                    <button onclick="checkVersion()">Run clang --version</button>
-                </div>
+            <div id="tab-val" class="tab-content">
                 <div class="toolbar">
-                    <span id="status-version" class="status-text"></span>
+                    <button onclick="run('cpp', 'val')">Run</button>
+                    <span id="status-val" class="status-text"></span>
                 </div>
+                <textarea id="source-val" spellcheck="false">#include &lt;nuscripten/val.h&gt;
+#include &lt;cstdio&gt;
+
+using nuscripten::val;
+
+int main() {
+    val navigator = val::global("navigator");
+
+    std::string userAgent = navigator["userAgent"].toString();
+    printf("User Agent: %s\n", userAgent.c_str());
+
+    std::string language = navigator["language"].toString();
+    printf("Language: %s\n", language.c_str());
+
+    int cores = navigator["hardwareConcurrency"].asInt();
+    printf("CPU cores: %d\n", cores);
+
+    val screen = val::global("screen");
+    int width = screen["width"].asInt();
+    int height = screen["height"].asInt();
+    printf("Screen: %dx%d\n", width, height);
+
+    double ratio = val::window()["devicePixelRatio"].asDouble();
+    printf("Device pixel ratio: %.1f\n", ratio);
+
+    return 0;
+}</textarea>
             </div>
         </div>
 
         <div class="output-panel">
-            <h2>Output</h2>
-            <div id="output">Output will appear here...</div>
+            <div class="panel-header"><h2>Output</h2></div>
+            <div id="output">Press Run to compile, link, and execute...</div>
         </div>
     </div>
 
     <script type="module">
-        import { createClang } from './clang.js';
+        import { Playground } from './playground.js';
 
         const output = document.getElementById('output');
-        const clang = createClang();
+        const tabs = ['c', 'cpp', 'val'];
         let activeTab = 'c';
-
-        window.switchTab = function(name) {
-            activeTab = name;
-            document.querySelectorAll('.tab').forEach((t, i) => {
-                t.classList.toggle('active', ['c','cpp','version'][i] === name);
-            });
-            document.querySelectorAll('.tab-content').forEach(t => {
-                t.classList.toggle('active', t.id === 'tab-' + name);
-            });
-        };
 
         function log(text) {
             output.textContent += text + '\n';
@@ -221,53 +239,35 @@ int main() {
             if (el) { el.textContent = text; el.className = 'status-text ' + type; }
         }
 
-        const streamOpts = { onStdout: log, onStderr: log };
+        const pg = new Playground({
+            onStdout: log,
+            onStderr: log,
+            onStatus: setStatus,
+        });
 
-        async function doCompile(args, files, outFile) {
-            output.textContent = '';
-            try {
-                setStatus('Compiling...');
-                const result = await clang.run(args, files, streamOpts);
-                log(`Exit code: ${result.exitCode}`);
-                if (result.files[outFile]) {
-                    log(`Output: ${outFile} (${result.files[outFile].length} bytes)`);
-                    setStatus('OK', 'success');
-                } else {
-                    setStatus('Failed', 'error');
-                }
-            } catch (e) {
-                log('Error: ' + e.message);
-                setStatus(e.message, 'error');
-            }
-        }
+        pg.getVersion().then(v => {
+            document.getElementById('clang-version').textContent = v;
+        });
 
-        window.checkVersion = async function() {
-            output.textContent = '';
-            try {
-                setStatus('Running...');
-                await clang.run(['clang', '--version'], {}, streamOpts);
-                setStatus('OK', 'success');
-            } catch (e) {
-                log('Error: ' + e.message);
-                setStatus(e.message, 'error');
-            }
+        window.switchTab = function(name) {
+            activeTab = name;
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', tabs[i] === name);
+            });
+            document.querySelectorAll('.tab-content').forEach(t => {
+                t.classList.toggle('active', t.id === 'tab-' + name);
+            });
         };
 
-        window.compileC = function() {
-            doCompile(
-                ['clang', '-c', 'hello.c', '-o', 'hello.o', '--target=wasm32-wasip1', '-O2'],
-                { 'hello.c': document.getElementById('source-c').value },
-                'hello.o'
-            );
-        };
-
-        window.compileCpp = function() {
-            doCompile(
-                ['clang++', '-c', 'hello.cpp', '-o', 'hello.o', '--target=wasm32-wasip1', '-O2', '-std=c++17',
-                 '-stdlib++-isystem', '/usr/include/wasm32-wasip1/c++/v1'],
-                { 'hello.cpp': document.getElementById('source-cpp').value },
-                'hello.o'
-            );
+        window.run = async function(lang, sourceId) {
+            output.textContent = '';
+            const src = document.getElementById('source-' + (sourceId || lang)).value;
+            try {
+                await pg.run(lang, src);
+            } catch (e) {
+                log('\nError: ' + e.message);
+                setStatus('Error', 'error');
+            }
         };
     </script>
 </body>

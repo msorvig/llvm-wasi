@@ -2,16 +2,24 @@ const external = ['fs', 'path', 'url'];
 
 export default [
   {
-    input: 'src/clang.js',
+    input: 'src/llvm.js',
     output: {
-      file: 'dist/clang.js',
+      file: 'dist/llvm.js',
       format: 'es',
     },
   },
   {
-    input: 'src/clang-worker.js',
+    input: 'src/llvm-worker.js',
     output: {
-      file: 'dist/clang-worker.js',
+      file: 'dist/llvm-worker.js',
+      format: 'es',
+    },
+    external,
+  },
+  {
+    input: 'playground/playground.js',
+    output: {
+      file: 'dist/playground.js',
       format: 'es',
     },
     external,
