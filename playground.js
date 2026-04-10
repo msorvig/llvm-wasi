@@ -2088,6 +2088,7 @@ class Playground {
         // Link
         const linkArgs = [
             'wasm-ld',
+            '-O2',
             '-L/usr/lib/wasm32-wasip1',
             '-L/usr/lib/wasm32-unknown-wasip1',
             '/usr/lib/wasm32-wasip1/crt1.o', 'main.o',
