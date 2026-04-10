@@ -1,0 +1,375 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WASI Clang Playground</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 16px;
+            gap: 12px;
+        }
+        header {
+            display: flex;
+            align-items: baseline;
+            gap: 12px;
+        }
+        header h1 { color: #00d9ff; font-size: 20px; }
+        header span { color: #888; font-size: 13px; }
+        #clang-version { margin-left: auto; color: #666; font-size: 12px; font-family: monospace; }
+        .tabs {
+            display: flex;
+            gap: 2px;
+        }
+        .tab {
+            padding: 8px 20px;
+            background: #0f0f23;
+            color: #888;
+            border: none;
+            border-radius: 6px 6px 0 0;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        .tab.active {
+            background: #16213e;
+            color: #00d9ff;
+        }
+        .main {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            min-height: 0;
+        }
+        .input-panel {
+            display: flex;
+            flex-direction: column;
+            background: #16213e;
+            border-radius: 0 8px 8px 8px;
+            overflow: hidden;
+        }
+        .tab-content { display: none; flex: 1; flex-direction: column; }
+        .tab-content.active { display: flex; }
+        textarea {
+            flex: 1;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 13px;
+            background: #0f0f23;
+            color: #00ff00;
+            border: none;
+            padding: 12px;
+            resize: none;
+            tab-size: 4;
+        }
+        textarea:focus { outline: none; }
+        .toolbar, .panel-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            height: 40px;
+        }
+        button {
+            background: #00d9ff;
+            color: #1a1a2e;
+            border: none;
+            padding: 6px 16px;
+            font-size: 13px;
+            font-weight: 600;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover { background: #00b8d9; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        button.secondary {
+            background: transparent;
+            color: #00d9ff;
+            border: 1px solid #00d9ff44;
+            font-weight: 500;
+            padding: 5px 12px;
+        }
+        button.secondary:hover { background: #00d9ff18; }
+        .status-text {
+            font-size: 12px;
+            color: #888;
+            margin-left: auto;
+        }
+        .status-text.success { color: #4caf50; }
+        .status-text.error { color: #f44336; }
+        .output-panel {
+            background: #16213e;
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .output-panel h2 {
+            font-size: 14px;
+            color: #00d9ff;
+        }
+        #output {
+            flex: 1;
+            background: #0f0f23;
+            color: #00ff00;
+            padding: 12px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 12px;
+            white-space: pre-wrap;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>WASI Clang Playground</h1>
+        <span>Compile, link, and run C/C++ in the browser</span>
+        <span id="clang-version"></span>
+    </header>
+
+    <div class="tabs">
+        <button class="tab active" onclick="switchTab('c')">C</button>
+        <button class="tab" onclick="switchTab('cpp')">C++</button>
+        <button class="tab" onclick="switchTab('val')">nuscripten</button>
+    </div>
+
+    <div class="main">
+        <div class="input-panel">
+            <div id="tab-c" class="tab-content active">
+                <div class="toolbar">
+                    <button onclick="run('c')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
+                    <span id="status-c" class="status-text"></span>
+                </div>
+                <textarea id="source-c">#include &lt;stdio.h&gt;
+
+int main() {
+    printf("Hello from WebAssembly!\n");
+
+    int sum = 0;
+    for (int i = 1; i &lt;= 10; i++) {
+        sum += i;
+    }
+    printf("Sum of 1-10: %d\n", sum);
+
+    return 0;
+}</textarea>
+            </div>
+
+            <div id="tab-cpp" class="tab-content">
+                <div class="toolbar">
+                    <button onclick="run('cpp')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
+                    <span id="status-cpp" class="status-text"></span>
+                </div>
+                <textarea id="source-cpp" spellcheck="false">#include &lt;print&gt;
+#include &lt;vector&gt;
+#include &lt;algorithm&gt;
+#include &lt;numeric&gt;
+
+int main() {
+    std::vector&lt;int&gt; nums = {5, 3, 8, 1, 9, 2, 7, 4, 6, 10};
+
+    std::sort(nums.begin(), nums.end());
+
+    std::print("Sorted:");
+    for (int n : nums) {
+        std::print(" {}", n);
+    }
+    std::println();
+
+    int sum = std::accumulate(nums.begin(), nums.end(), 0);
+    std::println("Sum: {}", sum);
+
+    return 0;
+}</textarea>
+            </div>
+
+            <div id="tab-val" class="tab-content">
+                <div class="toolbar">
+                    <button onclick="run('cpp', 'val')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
+                    <span id="status-val" class="status-text"></span>
+                </div>
+                <textarea id="source-val" spellcheck="false">#include &lt;nuscripten/val.h&gt;
+#include &lt;cstdio&gt;
+
+using nuscripten::val;
+
+int main() {
+    val navigator = val::global("navigator");
+
+    std::string userAgent = navigator["userAgent"].toString();
+    printf("User Agent: %s\n", userAgent.c_str());
+
+    std::string language = navigator["language"].toString();
+    printf("Language: %s\n", language.c_str());
+
+    int cores = navigator["hardwareConcurrency"].asInt();
+    printf("CPU cores: %d\n", cores);
+
+    val screen = val::global("screen");
+    int width = screen["width"].asInt();
+    int height = screen["height"].asInt();
+    printf("Screen: %dx%d\n", width, height);
+
+    double ratio = val::window()["devicePixelRatio"].asDouble();
+    printf("Device pixel ratio: %.1f\n", ratio);
+
+    return 0;
+}</textarea>
+            </div>
+        </div>
+
+        <div class="output-panel">
+            <div class="panel-header"><h2>Output</h2></div>
+            <div id="output">Press Run to compile, link, and execute...</div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { Playground } from './playground.js';
+
+        const output = document.getElementById('output');
+        const tabs = ['c', 'cpp', 'val'];
+        let activeTab = 'c';
+
+        function log(text) {
+            output.textContent += text + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function setStatus(text, type = '') {
+            const el = document.getElementById('status-' + activeTab);
+            if (el) { el.textContent = text; el.className = 'status-text ' + type; }
+        }
+
+        const pg = new Playground({
+            onStdout: log,
+            onStderr: log,
+            onStatus: setStatus,
+        });
+
+        pg.getVersion().then(v => {
+            document.getElementById('clang-version').textContent = v;
+        });
+
+        window.switchTab = function(name) {
+            activeTab = name;
+            document.querySelectorAll('.tab').forEach((t, i) => {
+                t.classList.toggle('active', tabs[i] === name);
+            });
+            document.querySelectorAll('.tab-content').forEach(t => {
+                t.classList.toggle('active', t.id === 'tab-' + name);
+            });
+        };
+
+        window.run = async function(lang, sourceId) {
+            output.textContent = '';
+            const src = document.getElementById('source-' + (sourceId || lang)).value;
+            try {
+                await pg.run(lang, src);
+            } catch (e) {
+                log('\nError: ' + e.message);
+                setStatus('Error', 'error');
+            }
+        };
+
+        // --- Sharing ---
+
+        async function compress(str) {
+            const bytes = new TextEncoder().encode(str);
+            const cs = new CompressionStream('gzip');
+            const writer = cs.writable.getWriter();
+            writer.write(bytes);
+            writer.close();
+            const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+            let binary = '';
+            for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        async function decompress(b64) {
+            const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            writer.write(bytes);
+            writer.close();
+            return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
+        }
+
+        function getSource() {
+            return document.getElementById('source-' + activeTab).value;
+        }
+
+        window.copyLink = async function() {
+            const code = await compress(getSource());
+            const url = `${location.origin}${location.pathname}#${activeTab}=${code}`;
+            await navigator.clipboard.writeText(url);
+            setStatus('Link copied!', 'success');
+        };
+
+        window.shareGist = async function() {
+            const source = getSource();
+            const filename = (activeTab === 'cpp' || activeTab === 'val') ? 'main.cpp' : 'main.c';
+            setStatus('Creating gist...', '');
+            try {
+                const res = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: 'WASI Clang Playground',
+                        public: true,
+                        files: { [filename]: { content: source } },
+                    }),
+                });
+                const data = await res.json();
+                await navigator.clipboard.writeText(data.html_url);
+                setStatus('Gist URL copied!', 'success');
+            } catch (e) {
+                setStatus('Gist failed', 'error');
+            }
+        };
+
+        // Restore from URL hash (#tab=<compressed>) or ?gist=<id>
+        async function restoreFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const gistId = params.get('gist');
+            if (gistId) {
+                try {
+                    const res = await fetch(`https://api.github.com/gists/${gistId}`);
+                    const data = await res.json();
+                    const file = Object.values(data.files)[0];
+                    const tab = file.filename.endsWith('.cpp') ? 'cpp' : 'c';
+                    switchTab(tab);
+                    document.getElementById('source-' + tab).value = file.content;
+                } catch (e) {}
+                return;
+            }
+            const hash = location.hash.slice(1);
+            const match = hash.match(/^(c|cpp|val)=(.+)$/);
+            if (match) {
+                const [, tab, encoded] = match;
+                try {
+                    const source = await decompress(encoded);
+                    switchTab(tab);
+                    document.getElementById('source-' + tab).value = source;
+                } catch (e) {}
+            }
+        }
+        restoreFromUrl();
+    </script>
+</body>
+</html>
