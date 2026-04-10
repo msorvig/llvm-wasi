@@ -125,6 +125,42 @@
             white-space: pre-wrap;
             overflow-y: auto;
         }
+        .token-dialog {
+            position: fixed;
+            inset: 0;
+            background: #0008;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .token-dialog.hidden { display: none; }
+        .token-box {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 24px;
+            width: 420px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+        .token-box h3 { color: #00d9ff; font-size: 15px; }
+        .token-box p { color: #aaa; font-size: 13px; line-height: 1.5; }
+        .token-box a { color: #00d9ff; }
+        .token-box input {
+            background: #0f0f23;
+            border: 1px solid #00d9ff44;
+            border-radius: 4px;
+            color: #eee;
+            font-family: monospace;
+            font-size: 13px;
+            padding: 8px 10px;
+            width: 100%;
+        }
+        .token-box input:focus { outline: 1px solid #00d9ff; }
+        .token-box .row { display: flex; gap: 8px; justify-content: flex-end; }
+        .token-box .clear { margin-right: auto; background: transparent; color: #f44336; border: 1px solid #f4433644; font-weight: 500; padding: 5px 12px; }
+        .token-box .clear:hover { background: #f4433618; }
     </style>
 </head>
 <body>
@@ -237,6 +273,19 @@ int main() {
         </div>
     </div>
 
+    <div id="token-dialog" class="token-dialog hidden">
+        <div class="token-box">
+            <h3>GitHub Token for Gist</h3>
+            <p>Create a <a href="https://github.com/settings/tokens/new?scopes=gist&description=WASI+Playground" target="_blank">GitHub token</a> with <code>gist</code> scope, then paste it here. It's stored only in your browser's localStorage.</p>
+            <input id="token-input" type="password" placeholder="ghp_..." />
+            <div class="row">
+                <button class="secondary clear" onclick="clearToken()">Clear saved token</button>
+                <button class="secondary" onclick="closeTokenDialog()">Cancel</button>
+                <button onclick="saveToken()">Save &amp; Create Gist</button>
+            </div>
+        </div>
+    </div>
+
     <script type="module">
         import { Playground } from './playground.js';
 
@@ -321,26 +370,63 @@ int main() {
             setStatus('Link copied!', 'success');
         };
 
-        window.shareGist = async function() {
+        async function createGistWithToken(token) {
             const source = getSource();
             const filename = (activeTab === 'cpp' || activeTab === 'val') ? 'main.cpp' : 'main.c';
             setStatus('Creating gist...', '');
-            try {
-                const res = await fetch('https://api.github.com/gists', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        description: 'WASI Clang Playground',
-                        public: true,
-                        files: { [filename]: { content: source } },
-                    }),
+            const res = await fetch('https://api.github.com/gists', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    description: 'WASI Clang Playground',
+                    public: true,
+                    files: { [filename]: { content: source } },
+                }),
+            });
+            if (!res.ok) throw new Error(`${res.status}`);
+            const data = await res.json();
+            await navigator.clipboard.writeText(data.html_url);
+            setStatus('Gist URL copied!', 'success');
+        }
+
+        window.shareGist = function() {
+            const token = localStorage.getItem('gh-token');
+            if (token) {
+                createGistWithToken(token).catch(() => {
+                    localStorage.removeItem('gh-token');
+                    setStatus('Token invalid — cleared', 'error');
                 });
-                const data = await res.json();
-                await navigator.clipboard.writeText(data.html_url);
-                setStatus('Gist URL copied!', 'success');
-            } catch (e) {
-                setStatus('Gist failed', 'error');
+            } else {
+                document.getElementById('token-dialog').classList.remove('hidden');
+                document.getElementById('token-input').focus();
             }
+        };
+
+        window.saveToken = async function() {
+            const token = document.getElementById('token-input').value.trim();
+            if (!token) return;
+            localStorage.setItem('gh-token', token);
+            document.getElementById('token-dialog').classList.add('hidden');
+            document.getElementById('token-input').value = '';
+            try {
+                await createGistWithToken(token);
+            } catch (e) {
+                localStorage.removeItem('gh-token');
+                setStatus('Token invalid — cleared', 'error');
+            }
+        };
+
+        window.clearToken = function() {
+            localStorage.removeItem('gh-token');
+            document.getElementById('token-dialog').classList.add('hidden');
+        };
+
+        window.closeTokenDialog = function() {
+            document.getElementById('token-dialog').classList.add('hidden');
+            document.getElementById('token-input').value = '';
         };
 
         // Restore from URL hash (#tab=<compressed>) or ?gist=<id>
