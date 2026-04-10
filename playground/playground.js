@@ -5,12 +5,12 @@
 //   await pg.ready;
 //   const result = await pg.run('c', source);
 
-import { createClang } from '../src/llvm.js';
+import { createLlvm } from '../src/llvm.js';
 import { createRuntimeComponents, ExitStatus } from '../nuscripten-core/runtime/loader.js';
 
 export class Playground {
     constructor(options = {}) {
-        this._clang = createClang(options);
+        this._clang = createLlvm(options);
         this._onStdout = options.onStdout || (() => {});
         this._onStderr = options.onStderr || (() => {});
         this._onStatus = options.onStatus || (() => {});

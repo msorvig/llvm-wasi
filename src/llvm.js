@@ -2,7 +2,7 @@
 //
 // Usage:
 //   // Non-blocking — starts fetching immediately while user interacts with UI
-//   const clang = createClang();
+//   const clang = createLlvm();
 //   // run() waits for initialization to complete if needed, then dispatches:
 //   const [r1, r2] = await Promise.all([
 //       clang.run(['clang', '-c', 'a.c', '-o', 'a.o', '--target=wasm32-wasip1'], { 'a.c': src1 }),
@@ -21,7 +21,7 @@ const SYSROOT_BUNDLE_PATH = './sysroot.bundle';
 //   wasmPath: URL to the llvm wasm binary (default: ../clang-wasi/bin/llvm.wasm)
 //   sysrootPath: URL to sysroot bundle (default: ../clang-wasi/sysroot.bundle)
 //   poolSize: max concurrent workers (default: navigator.hardwareConcurrency or 4)
-export function createClang(options = {}) {
+export function createLlvm(options = {}) {
     const wasmUrl = new URL(options.wasmPath || LLVM_WASM_PATH, import.meta.url).href;
     const sysrootUrl = new URL(options.sysrootPath || SYSROOT_BUNDLE_PATH, import.meta.url).href;
     const poolSize = options.poolSize || navigator.hardwareConcurrency || 4;
@@ -156,7 +156,7 @@ export function createClang(options = {}) {
 
 // Convenience: run clang once
 export async function runClang(args, files = {}, options = {}) {
-    const clang = createClang({ ...options, poolSize: 1 });
+    const clang = createLlvm({ ...options, poolSize: 1 });
     try {
         return await clang.run(['clang', ...args], files, options);
     } finally {
@@ -166,7 +166,7 @@ export async function runClang(args, files = {}, options = {}) {
 
 // Convenience: run clang++ once
 export async function runClangPP(args, files = {}, options = {}) {
-    const clang = createClang({ ...options, poolSize: 1 });
+    const clang = createLlvm({ ...options, poolSize: 1 });
     try {
         return await clang.run(['clang++', ...args], files, options);
     } finally {
@@ -176,7 +176,7 @@ export async function runClangPP(args, files = {}, options = {}) {
 
 // Convenience: run wasm-ld once
 export async function runWasmLd(args, files = {}, options = {}) {
-    const clang = createClang({ ...options, poolSize: 1 });
+    const clang = createLlvm({ ...options, poolSize: 1 });
     try {
         return await clang.run(['wasm-ld', ...args], files, options);
     } finally {
@@ -186,7 +186,7 @@ export async function runWasmLd(args, files = {}, options = {}) {
 
 // Convenience: run any LLVM tool once
 export async function runLLVM(args, files = {}, options = {}) {
-    const clang = createClang({ ...options, poolSize: 1 });
+    const clang = createLlvm({ ...options, poolSize: 1 });
     try {
         return await clang.run(args, files, options);
     } finally {

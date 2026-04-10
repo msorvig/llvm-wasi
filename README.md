@@ -68,14 +68,14 @@ It includes examples for C (printf), C++ (std::print), and nuscripten (val.h JS 
 ## API
 
 ```js
-import { createClang } from './llvm.js';
+import { createLlvm } from './llvm.js';
 
-const clang = createClang();
-const result = await clang.run(args, files, runOptions);
-clang.terminate();
+const llvm = createLlvm();
+const result = await llvm.run(args, files, runOptions);
+llvm.terminate();
 ```
 
-### `createClang(options)`
+### `createLlvm(options)`
 
 Creates a worker pool that loads the wasm binary and sysroot in the background. Returns immediately.
 
@@ -101,6 +101,27 @@ Returns a result object:
   everything written by the tool, excluding sysroot files.
 - `result.stdout` — array of stdout lines
 - `result.stderr` — array of stderr lines
+
+Examples:
+
+```js
+const llvm = createLlvm();
+
+// Compile C to object file
+const src = `#include <stdio.h>\nint main() { printf("hello\\n"); }`;
+const compile = await llvm.run(
+    ['clang', '--target=wasm32-wasip1', '-c', 'main.c', '-o', 'main.o'],
+    { 'main.c': src }
+);
+
+// Link object file to wasm binary
+const link = await llvm.run(
+    ['wasm-ld', 'main.o', '-o', 'main.wasm', '--no-entry', '--export-all'],
+    { 'main.o': compile.files['main.o'] }
+);
+
+const wasmBinary = link.files['main.wasm'];
+```
 
 ### Convenience functions
 
