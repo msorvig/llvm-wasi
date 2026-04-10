@@ -388,8 +388,9 @@ int main() {
             });
             if (!res.ok) throw new Error(`${res.status}`);
             const data = await res.json();
-            await navigator.clipboard.writeText(data.html_url);
-            setStatus('Gist URL copied!', 'success');
+            const playgroundUrl = `${location.origin}${location.pathname}?gist=${data.id}`;
+            await navigator.clipboard.writeText(playgroundUrl);
+            setStatus('Link copied!', 'success');
         }
 
         window.shareGist = function() {
