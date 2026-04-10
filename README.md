@@ -50,15 +50,15 @@ The `dist/` directory contains everything needed to run clang in the browser:
 - `llvm.js` — main API (ES module)
 - `llvm-worker.js` — web worker that runs LLVM tools
 - `llvm.wasm` — clang + lld compiled to WebAssembly
-- `sysroot.bundle` — headers and static libraries (clang builtins, wasi-libc, libc++, compiler-rt)
-- `playground.html` — interactive playground
+- `sysroot.bundle.gz` — headers and static libraries (clang builtins, wasi-libc, libc++, compiler-rt)
+- `index.html` — interactive playground
 - `playground.js` — playground API (Playground class + runtime)
 
 The `dist/` branch contains checked in versions of the files.
 
 ## Playground
 
-Open `dist/playground.html` in a browser (requires a local server for ES module and worker support):
+Open `dist/index.html` in a browser (requires a local server for ES module and worker support):
 
     cd dist && python3 -m http.server 8080
 
@@ -80,7 +80,7 @@ llvm.terminate();
 Creates a worker pool that loads the wasm binary and sysroot in the background. Returns immediately.
 
 - `options.wasmPath` — URL to `llvm.wasm` (default: `./llvm.wasm` relative to `llvm.js`)
-- `options.sysrootPath` — URL to `sysroot.bundle` (default: `./sysroot.bundle`)
+- `options.sysrootPath` — URL to `sysroot.bundle.gz` (default: `./sysroot.bundle.gz`; plain `.bundle` also supported)
 - `options.poolSize` — max concurrent workers (default: `navigator.hardwareConcurrency`)
 
 ### `clang.run(args, files, runOptions)`

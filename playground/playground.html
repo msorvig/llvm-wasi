@@ -89,9 +89,18 @@
         }
         button:hover { background: #00b8d9; }
         button:disabled { background: #666; cursor: not-allowed; }
+        button.secondary {
+            background: transparent;
+            color: #00d9ff;
+            border: 1px solid #00d9ff44;
+            font-weight: 500;
+            padding: 5px 12px;
+        }
+        button.secondary:hover { background: #00d9ff18; }
         .status-text {
             font-size: 12px;
             color: #888;
+            margin-left: auto;
         }
         .status-text.success { color: #4caf50; }
         .status-text.error { color: #f44336; }
@@ -136,6 +145,8 @@
             <div id="tab-c" class="tab-content active">
                 <div class="toolbar">
                     <button onclick="run('c')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
                     <span id="status-c" class="status-text"></span>
                 </div>
                 <textarea id="source-c">#include &lt;stdio.h&gt;
@@ -156,6 +167,8 @@ int main() {
             <div id="tab-cpp" class="tab-content">
                 <div class="toolbar">
                     <button onclick="run('cpp')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
                     <span id="status-cpp" class="status-text"></span>
                 </div>
                 <textarea id="source-cpp" spellcheck="false">#include &lt;print&gt;
@@ -184,6 +197,8 @@ int main() {
             <div id="tab-val" class="tab-content">
                 <div class="toolbar">
                     <button onclick="run('cpp', 'val')">Run</button>
+                    <button class="secondary" onclick="copyLink()">Copy Link</button>
+                    <button class="secondary" onclick="shareGist()">Gist</button>
                     <span id="status-val" class="status-text"></span>
                 </div>
                 <textarea id="source-val" spellcheck="false">#include &lt;nuscripten/val.h&gt;
@@ -269,6 +284,92 @@ int main() {
                 setStatus('Error', 'error');
             }
         };
+
+        // --- Sharing ---
+
+        async function compress(str) {
+            const bytes = new TextEncoder().encode(str);
+            const cs = new CompressionStream('gzip');
+            const writer = cs.writable.getWriter();
+            writer.write(bytes);
+            writer.close();
+            const buf = new Uint8Array(await new Response(cs.readable).arrayBuffer());
+            let binary = '';
+            for (let i = 0; i < buf.length; i++) binary += String.fromCharCode(buf[i]);
+            return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        async function decompress(b64) {
+            const bin = atob(b64.replace(/-/g, '+').replace(/_/g, '/'));
+            const bytes = new Uint8Array(bin.length);
+            for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+            const ds = new DecompressionStream('gzip');
+            const writer = ds.writable.getWriter();
+            writer.write(bytes);
+            writer.close();
+            return new TextDecoder().decode(await new Response(ds.readable).arrayBuffer());
+        }
+
+        function getSource() {
+            return document.getElementById('source-' + activeTab).value;
+        }
+
+        window.copyLink = async function() {
+            const code = await compress(getSource());
+            const url = `${location.origin}${location.pathname}#${activeTab}=${code}`;
+            await navigator.clipboard.writeText(url);
+            setStatus('Link copied!', 'success');
+        };
+
+        window.shareGist = async function() {
+            const source = getSource();
+            const filename = (activeTab === 'cpp' || activeTab === 'val') ? 'main.cpp' : 'main.c';
+            setStatus('Creating gist...', '');
+            try {
+                const res = await fetch('https://api.github.com/gists', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        description: 'WASI Clang Playground',
+                        public: true,
+                        files: { [filename]: { content: source } },
+                    }),
+                });
+                const data = await res.json();
+                await navigator.clipboard.writeText(data.html_url);
+                setStatus('Gist URL copied!', 'success');
+            } catch (e) {
+                setStatus('Gist failed', 'error');
+            }
+        };
+
+        // Restore from URL hash (#tab=<compressed>) or ?gist=<id>
+        async function restoreFromUrl() {
+            const params = new URLSearchParams(location.search);
+            const gistId = params.get('gist');
+            if (gistId) {
+                try {
+                    const res = await fetch(`https://api.github.com/gists/${gistId}`);
+                    const data = await res.json();
+                    const file = Object.values(data.files)[0];
+                    const tab = file.filename.endsWith('.cpp') ? 'cpp' : 'c';
+                    switchTab(tab);
+                    document.getElementById('source-' + tab).value = file.content;
+                } catch (e) {}
+                return;
+            }
+            const hash = location.hash.slice(1);
+            const match = hash.match(/^(c|cpp|val)=(.+)$/);
+            if (match) {
+                const [, tab, encoded] = match;
+                try {
+                    const source = await decompress(encoded);
+                    switchTab(tab);
+                    document.getElementById('source-' + tab).value = source;
+                } catch (e) {}
+            }
+        }
+        restoreFromUrl();
     </script>
 </body>
 </html>

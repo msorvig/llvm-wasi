@@ -11,7 +11,7 @@
 //   clang.terminate();
 
 const LLVM_WASM_PATH = './llvm.wasm';
-const SYSROOT_BUNDLE_PATH = './sysroot.bundle';
+const SYSROOT_BUNDLE_PATH = './sysroot.bundle.gz';
 
 // Create a clang pool. Returns immediately (non-blocking).
 // Fetching + compilation happens in the background on a worker.

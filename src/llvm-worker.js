@@ -42,7 +42,10 @@ async function handleInit(id, { wasmUrl, sysrootUrl }) {
         if (!responses[1].ok) {
             throw new Error(`Failed to fetch sysroot: ${responses[1].status}`);
         }
-        sysrootBundle = new Uint8Array(await responses[1].arrayBuffer());
+        const body = sysrootUrl.endsWith('.gz')
+            ? responses[1].body.pipeThrough(new DecompressionStream('gzip'))
+            : responses[1].body;
+        sysrootBundle = new Uint8Array(await new Response(body).arrayBuffer());
     }
 
     // Return compiled module + sysroot to main thread for sharing with other workers

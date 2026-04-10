@@ -15,8 +15,8 @@ mkdir -p dist
 npx rollup -c
 
 cp -L clang-wasi/bin/llvm dist/llvm.wasm
-cp clang-wasi/sysroot.bundle dist/
-cp playground/playground.html dist/
+gzip -9 -c clang-wasi/sysroot.bundle > dist/sysroot.bundle.gz
+cp playground/playground.html dist/index.html
 
 echo ""
 echo "Built dist/:"
