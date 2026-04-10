@@ -54,6 +54,7 @@ export class Playground {
 
         this._onStatus('Compiling...');
         this._onStdout('--- Compiling ---');
+        this._onStdout('$ ' + compileArgs.join(' '));
         const compile = await this._clang.run(compileArgs, { [srcFile]: source }, { onStderr: this._onStderr });
         if (compile.exitCode !== 0 || !compile.files['main.o']) {
             this._onStatus('Compile failed', 'error');
@@ -77,6 +78,7 @@ export class Playground {
 
         this._onStatus('Linking...');
         this._onStdout('\n--- Linking ---');
+        this._onStdout('$ ' + linkArgs.join(' '));
         const link = await this._clang.run(linkArgs, { 'main.o': compile.files['main.o'] }, { onStderr: this._onStderr });
         if (link.exitCode !== 0 || !link.files['main.wasm']) {
             this._onStatus('Link failed', 'error');
