@@ -4,4 +4,4 @@
 	branch = wasi
 [submodule "nuscripten-core"]
 	path = nuscripten-core
-	url = git@github.com:msorvig/nuscripten-core.git
+	url = https://github.com/msorvig/nuscripten-core.git
