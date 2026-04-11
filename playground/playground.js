@@ -8,12 +8,23 @@
 import { createLlvm } from '../src/llvm.js';
 import { createRuntimeComponents, ExitStatus } from '../nuscripten-core/runtime/loader.js';
 
+export const DEFAULT_SETTINGS = {
+    compileOpt: 'O2',   // O0, O1, O2, O3, Os, Oz
+    linkOpt: 'O2',      // O0, O1, O2
+    strip: true,        // --strip-all
+    debugInfo: false,   // -g
+    cppStd: 'c++23',    // c++17, c++20, c++23
+    cStd: 'c17',        // c11, c17, c23
+    warnings: false,    // -Wall -Wextra
+};
+
 export class Playground {
     constructor(options = {}) {
         this._clang = createLlvm(options);
         this._onStdout = options.onStdout || (() => {});
         this._onStderr = options.onStderr || (() => {});
         this._onStatus = options.onStatus || (() => {});
+        this.settings = { ...DEFAULT_SETTINGS, ...options.settings };
         this._versionPromise = this._fetchVersion();
     }
 
@@ -44,12 +55,18 @@ export class Playground {
         const srcFile = isCpp ? 'main.cpp' : 'main.c';
         const compiler = isCpp ? 'clang++' : 'clang';
 
+        const s = this.settings;
+
         // Compile
         const compileArgs = [compiler, '-c', srcFile, '-o', 'main.o',
-            '--target=wasm32-wasip1', '-O2', '-I/usr/include'];
+            '--target=wasm32-wasip1', `-${s.compileOpt}`, '-I/usr/include'];
+        if (s.debugInfo) compileArgs.push('-g');
+        if (s.warnings) compileArgs.push('-Wall', '-Wextra');
         if (isCpp) {
-            compileArgs.push('-std=c++23', '-fno-exceptions',
+            compileArgs.push(`-std=${s.cppStd}`, '-fno-exceptions',
                 '-stdlib++-isystem', '/usr/include/wasm32-wasip1/c++/v1');
+        } else {
+            compileArgs.push(`-std=${s.cStd}`);
         }
 
         this._onStatus('Compiling...');
@@ -65,7 +82,7 @@ export class Playground {
         // Link
         const linkArgs = [
             'wasm-ld',
-            '-O2',
+            `-${s.linkOpt}`,
             '-L/usr/lib/wasm32-wasip1',
             '-L/usr/lib/wasm32-unknown-wasip1',
             '/usr/lib/wasm32-wasip1/crt1.o', 'main.o',
@@ -73,9 +90,9 @@ export class Playground {
             '--import-memory', '--allow-undefined',
             '-o', 'main.wasm',
         ];
-        if (isCpp) {
-            linkArgs.splice(linkArgs.indexOf('-lc'), 0, '-lc++', '-lc++abi');
-        }
+        if (isCpp) linkArgs.splice(linkArgs.indexOf('-lc'), 0, '-lc++', '-lc++abi');
+        if (s.strip) linkArgs.push('--strip-all');
+        if (s.debugInfo) linkArgs.push('--export-dynamic');
 
         this._onStatus('Linking...');
         this._onStdout('\n--- Linking ---');

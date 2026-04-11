@@ -125,6 +125,65 @@
             white-space: pre-wrap;
             overflow-y: auto;
         }
+        .settings-btn {
+            background: transparent;
+            color: #666;
+            border: none;
+            font-size: 18px;
+            padding: 0 4px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        .settings-btn:hover { color: #00d9ff; background: transparent; }
+        .settings-dialog {
+            position: fixed;
+            inset: 0;
+            background: #0008;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .settings-dialog.hidden { display: none; }
+        .settings-box {
+            background: #16213e;
+            border-radius: 8px;
+            padding: 24px;
+            width: 480px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .settings-box h3 { color: #00d9ff; font-size: 15px; margin-bottom: 2px; }
+        .setting-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .setting-row label {
+            color: #aaa;
+            font-size: 13px;
+            width: 150px;
+            flex-shrink: 0;
+        }
+        .btn-group { display: flex; gap: 2px; }
+        .btn-group button {
+            background: #0f0f23;
+            color: #888;
+            border: 1px solid #333;
+            padding: 4px 10px;
+            font-size: 12px;
+            font-weight: 500;
+            border-radius: 3px;
+        }
+        .btn-group button:hover { color: #ccc; background: #0f0f23; }
+        .btn-group button.active {
+            background: #00d9ff18;
+            color: #00d9ff;
+            border-color: #00d9ff44;
+        }
+        .setting-row input[type=checkbox] { width: 16px; height: 16px; accent-color: #00d9ff; cursor: pointer; }
+        .settings-box .row { display: flex; justify-content: flex-end; margin-top: 4px; }
         .token-dialog {
             position: fixed;
             inset: 0;
@@ -168,6 +227,7 @@
         <h1>WASI Clang Playground</h1>
         <span>Compile, link, and run C/C++ in the browser</span>
         <span id="clang-version"></span>
+        <button class="settings-btn" onclick="openSettings()" title="Settings">⚙</button>
     </header>
 
     <div class="tabs">
@@ -273,6 +333,60 @@ int main() {
         </div>
     </div>
 
+    <div id="settings-dialog" class="settings-dialog hidden">
+        <div class="settings-box">
+            <h3>Settings</h3>
+            <div class="setting-row">
+                <label>Optimize (compile)</label>
+                <div class="btn-group" id="set-compileOpt">
+                    <button onclick="setSetting('compileOpt','O0')">O0</button>
+                    <button onclick="setSetting('compileOpt','O1')">O1</button>
+                    <button onclick="setSetting('compileOpt','O2')">O2</button>
+                    <button onclick="setSetting('compileOpt','O3')">O3</button>
+                    <button onclick="setSetting('compileOpt','Os')">Os</button>
+                    <button onclick="setSetting('compileOpt','Oz')">Oz</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Optimize (link)</label>
+                <div class="btn-group" id="set-linkOpt">
+                    <button onclick="setSetting('linkOpt','O0')">O0</button>
+                    <button onclick="setSetting('linkOpt','O1')">O1</button>
+                    <button onclick="setSetting('linkOpt','O2')">O2</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>C++ standard</label>
+                <div class="btn-group" id="set-cppStd">
+                    <button onclick="setSetting('cppStd','c++17')">c++17</button>
+                    <button onclick="setSetting('cppStd','c++20')">c++20</button>
+                    <button onclick="setSetting('cppStd','c++23')">c++23</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>C standard</label>
+                <div class="btn-group" id="set-cStd">
+                    <button onclick="setSetting('cStd','c11')">c11</button>
+                    <button onclick="setSetting('cStd','c17')">c17</button>
+                    <button onclick="setSetting('cStd','c23')">c23</button>
+                </div>
+            </div>
+            <div class="setting-row">
+                <label>Strip binary</label>
+                <input type="checkbox" id="set-strip" onchange="setSetting('strip', this.checked)">
+            </div>
+            <div class="setting-row">
+                <label>Debug info</label>
+                <input type="checkbox" id="set-debugInfo" onchange="setSetting('debugInfo', this.checked)">
+            </div>
+            <div class="setting-row">
+                <label>Warnings (-Wall -Wextra)</label>
+                <input type="checkbox" id="set-warnings" onchange="setSetting('warnings', this.checked)">
+            </div>
+            <div class="row"><button onclick="closeSettings()">Close</button></div>
+        </div>
+    </div>
+
     <div id="token-dialog" class="token-dialog hidden">
         <div class="token-box">
             <h3>GitHub Token for Gist</h3>
@@ -287,7 +401,7 @@ int main() {
     </div>
 
     <script type="module">
-        import { Playground } from './playground.js';
+        import { Playground, DEFAULT_SETTINGS } from './playground.js';
 
         const output = document.getElementById('output');
         const tabs = ['c', 'cpp', 'val'];
@@ -457,6 +571,43 @@ int main() {
             }
         }
         restoreFromUrl();
+
+        // --- Settings ---
+
+        function loadSettings() {
+            try { return { ...DEFAULT_SETTINGS, ...JSON.parse(localStorage.getItem('settings')) }; }
+            catch (e) { return { ...DEFAULT_SETTINGS }; }
+        }
+
+        function applySettingsToUI(s) {
+            for (const [key, val] of Object.entries(s)) {
+                const group = document.getElementById('set-' + key);
+                if (group && group.classList.contains('btn-group')) {
+                    group.querySelectorAll('button').forEach(b => {
+                        b.classList.toggle('active', b.textContent === val);
+                    });
+                }
+                const checkbox = document.getElementById('set-' + key);
+                if (checkbox && checkbox.type === 'checkbox') checkbox.checked = val;
+            }
+        }
+
+        window.setSetting = function(key, value) {
+            pg.settings[key] = value;
+            localStorage.setItem('settings', JSON.stringify(pg.settings));
+            applySettingsToUI(pg.settings);
+        };
+
+        window.openSettings = function() {
+            applySettingsToUI(pg.settings);
+            document.getElementById('settings-dialog').classList.remove('hidden');
+        };
+
+        window.closeSettings = function() {
+            document.getElementById('settings-dialog').classList.add('hidden');
+        };
+
+        pg.settings = loadSettings();
     </script>
 </body>
 </html>
